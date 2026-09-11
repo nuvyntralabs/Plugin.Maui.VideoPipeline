@@ -1,0 +1,49 @@
+## Build
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+artifacts/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.vs/
+.idea/
+*.swp
+*~
+
+## NuGet
+*.nupkg
+*.snupkg
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+## OS
+.DS_Store
+Thumbs.db
+
+## MAUI / Xamarin
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+*.xcuserstate
+*.xccheckout
+*.xcscmblueprint
+**/Platforms/**/*.app
+*.ipa
+*.apk
+*.aab
+
+## Test
+TestResults/
+[Tt]est[Rr]esult*/
+*.trx
+coverage*
+*.coverage
+*.coveragexml
+
+## Publish
+publish/
+out/

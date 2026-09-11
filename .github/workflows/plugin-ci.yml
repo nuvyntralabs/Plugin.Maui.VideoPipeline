@@ -1,0 +1,137 @@
+name: Plugin CI
+
+on:
+  workflow_call:
+    inputs:
+      plugin:
+        description: Hub submodule folder. Leave empty when this workflow is called from a plugin repository.
+        required: false
+        type: string
+        default: ""
+      runner:
+        description: GitHub-hosted runner label
+        required: false
+        type: string
+        default: ubuntu-latest
+      frameworks:
+        description: Comma-separated TFMs to build (prefix match, e.g. net10.0-windows)
+        required: false
+        type: string
+        default: net10.0
+      pack:
+        description: Pack packable src projects after a successful build
+        required: false
+        type: boolean
+        default: true
+      test:
+        description: Run tests that target the requested frameworks
+        required: false
+        type: boolean
+        default: true
+      install_workloads:
+        description: Install .NET MAUI workloads before the build
+        required: false
+        type: boolean
+        default: false
+      workloads:
+        description: Workloads to install when install_workloads is true
+        required: false
+        type: string
+        default: maui-android maui-ios
+      job_name:
+        description: Optional job display name
+        required: false
+        type: string
+        default: ""
+
+jobs:
+  plugin:
+    name: ${{ inputs.job_name != '' && inputs.job_name || format('{0} ({1})', inputs.plugin || github.event.repository.name, inputs.frameworks) }}
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout caller
+        uses: actions/checkout@v4
+
+      - name: Checkout plugin submodule
+        if: inputs.plugin != ''
+        run: |
+          set -euo pipefail
+          git submodule update --init --depth 1 "${{ inputs.plugin }}"
+          if [ "${{ inputs.plugin }}" = "Observability" ]; then
+            git submodule update --init --depth 1 \
+              AppHealth NetworkMonitor ApiResilience BackgroundTasks \
+              OfflineSync SmartUpload DeviceSession
+          fi
+
+      - name: Fetch hub CI scripts
+        if: hashFiles('.github/scripts/run-plugin-ci.py') == ''
+        uses: actions/checkout@v4
+        with:
+          repository: nuvyntralabs/MauiEssentials
+          ref: main
+          path: .ci-tools
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Install MAUI workloads
+        run: |
+          set -euo pipefail
+          # `maui` is not supported on Linux. NETSDK1147 "maui-tizen" means any MAUI
+          # workload is missing; maui-android is enough to restore UseMaui libraries.
+          case "${RUNNER_OS}" in
+            Linux) dotnet workload install maui-android --skip-sign-check ;;
+            macOS) dotnet workload install maui-android maui-ios maui-maccatalyst --skip-sign-check ;;
+            Windows) dotnet workload install maui-android maui-windows --skip-sign-check ;;
+            *)
+              echo "::error::Unsupported RUNNER_OS=${RUNNER_OS}"
+              exit 1
+              ;;
+          esac
+
+      - name: Build, test, pack
+        env:
+          CI: "true"
+          PYTHONUNBUFFERED: "1"
+        run: |
+          set -euo pipefail
+          script=".github/scripts/run-plugin-ci.py"
+          if [ ! -f "$script" ]; then
+            script=".ci-tools/.github/scripts/run-plugin-ci.py"
+          fi
+          plugin_root="."
+          if [ -n "${{ inputs.plugin }}" ]; then
+            plugin_root="${{ inputs.plugin }}"
+          fi
+          extra=()
+          if [ "${{ inputs.test }}" = "true" ]; then
+            extra+=(--test)
+          else
+            extra+=(--no-test)
+          fi
+          if [ "${{ inputs.pack }}" = "true" ]; then
+            extra+=(--pack)
+          else
+            extra+=(--no-pack)
+          fi
+          python3 "$script" \
+            --plugin-root "$plugin_root" \
+            --frameworks "${{ inputs.frameworks }}" \
+            --configuration Release \
+            "${extra[@]}" \
+            --stage-dir artifacts/nuget
+
+      - name: Upload NuGet packages
+        if: inputs.pack
+        uses: actions/upload-artifact@v4
+        with:
+          name: nuget-${{ inputs.plugin || github.event.repository.name }}-${{ runner.os }}
+          path: artifacts/nuget/*
+          if-no-files-found: error
+          retention-days: 14

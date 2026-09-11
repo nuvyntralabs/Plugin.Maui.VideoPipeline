@@ -1,0 +1,212 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Unused. CI publishes after key, version, test, and pack checks succeed
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  version-align:
+    name: Version alignment
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        shell: bash
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - name: Checkout package repo
+        uses: actions/checkout@v4
+
+      - name: Fetch hub CI scripts
+        uses: actions/checkout@v4
+        with:
+          repository: nuvyntralabs/MauiEssentials
+          ref: main
+          path: .ci-tools
+
+      - name: Require matching packable package versions
+        id: check
+        run: |
+          set -euo pipefail
+          script=".github/scripts/check-versions.py"
+          if [ ! -f "$script" ]; then
+            script=".ci-tools/.github/scripts/check-versions.py"
+          fi
+          if [ ! -f "$script" ]; then
+            echo "::error::check-versions.py not found after hub checkout"
+            find .ci-tools -type f | sort | head -100
+            exit 1
+          fi
+          python3 "$script" --plugin-root .
+
+  version-check:
+    name: NuGet release
+    needs: [version-align]
+    if: success()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout package repo
+        uses: actions/checkout@v4
+
+      - name: Fetch hub CI scripts
+        uses: actions/checkout@v4
+        with:
+          repository: nuvyntralabs/MauiEssentials
+          ref: main
+          path: .ci-tools
+
+      - name: Check NUGET_KEY and published version
+        id: check
+        env:
+          NUGET_KEY: ${{ secrets.NUGET_KEY }}
+        run: |
+          set -euo pipefail
+          script=".github/scripts/check-nuget-release.py"
+          if [ ! -f "$script" ]; then
+            script=".ci-tools/.github/scripts/check-nuget-release.py"
+          fi
+          if [ ! -f "$script" ]; then
+            echo "::error::check-nuget-release.py not found after hub checkout"
+            find .ci-tools -type f | sort | head -100
+            exit 1
+          fi
+          python3 "$script" --plugin-root .
+
+  test:
+    name: Unit tests
+    needs: [version-check]
+    if: success()
+    uses: ./.github/workflows/plugin-ci.yml
+    with:
+      runner: ubuntu-latest
+      frameworks: net10.0
+      pack: false
+      test: true
+      job_name: Unit tests
+
+  linux:
+    needs: [test]
+    if: success()
+    uses: ./.github/workflows/plugin-ci.yml
+    with:
+      runner: ubuntu-latest
+      frameworks: net10.0
+      pack: true
+      test: false
+
+  macos:
+    needs: [test]
+    if: success()
+    uses: ./.github/workflows/plugin-ci.yml
+    with:
+      runner: macos-latest
+      frameworks: net10.0,net10.0-android,net10.0-ios,net10.0-maccatalyst
+      pack: true
+      test: false
+      install_workloads: true
+      workloads: maui-android maui-ios maui-maccatalyst
+
+  windows:
+    needs: [test]
+    if: success()
+    uses: ./.github/workflows/plugin-ci.yml
+    with:
+      runner: windows-latest
+      frameworks: net10.0,net10.0-windows
+      pack: true
+      test: false
+      install_workloads: true
+      workloads: maui-windows
+
+  publish:
+    name: nuget.org and GitHub Packages
+    needs: [linux, macos, windows]
+    if: success()
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout package repo
+        uses: actions/checkout@v4
+
+      - name: Fetch hub CI scripts
+        uses: actions/checkout@v4
+        with:
+          repository: nuvyntralabs/MauiEssentials
+          ref: main
+          path: .ci-tools
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Download macOS packages
+        uses: actions/download-artifact@v4
+        with:
+          pattern: nuget-*-macOS
+          path: packages
+          merge-multiple: true
+
+      - name: Download Windows packages
+        uses: actions/download-artifact@v4
+        with:
+          pattern: nuget-*-Windows
+          path: packages-windows
+          merge-multiple: true
+
+      - name: Merge Windows TFMs into macOS nupkg
+        run: |
+          set -euo pipefail
+          script=".github/scripts/merge-windows-nupkg.py"
+          if [ ! -f "$script" ]; then
+            script=".ci-tools/.github/scripts/merge-windows-nupkg.py"
+          fi
+          if [ ! -f "$script" ]; then
+            echo "::error::merge-windows-nupkg.py not found"
+            exit 1
+          fi
+          python3 "$script" --mac packages --windows packages-windows
+
+      - name: Push nupkg and snupkg
+        env:
+          NUGET_KEY: ${{ secrets.NUGET_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
+        run: |
+          set -euo pipefail
+          script=".github/scripts/push-nuget-packages.py"
+          if [ ! -f "$script" ]; then
+            script=".ci-tools/.github/scripts/push-nuget-packages.py"
+          fi
+          if [ ! -f "$script" ]; then
+            echo "::error::push-nuget-packages.py not found"
+            exit 1
+          fi
+          python3 "$script" --packages-dir packages

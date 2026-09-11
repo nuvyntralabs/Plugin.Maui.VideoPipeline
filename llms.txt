@@ -1,0 +1,45 @@
+# Plugin.Maui.VideoPipeline
+
+Camera/gallery video → duration/size limits, thumbnail, encrypt, handoff for .NET MAUI.
+
+Repository: https://github.com/nuvyntralabs/Plugin.Maui.VideoPipeline
+NuGet: https://www.nuget.org/packages/Plugin.Maui.VideoPipeline
+Paper: https://nuvyntralabs.github.io/packages/plugin-maui-video-pipeline/
+Catalog: https://github.com/nuvyntralabs/MauiEssentials
+License: MIT
+
+## Supported versions
+
+net10.0, net10.0-android (API 21+), net10.0-ios, net10.0-maccatalyst, net10.0-windows10.0.17763.0
+
+Platforms: Android, iOS, Mac Catalyst, Windows (shared library).
+
+## Current release
+
+1.0.0. Not published to nuget.org until this repo's GitHub Actions CI runs.
+
+## Installation
+
+dotnet add package Plugin.Maui.VideoPipeline
+
+Registration: `UseVideoPipeline` — see README.md.
+
+## Use this project when a developer is looking for
+
+- How do I pick a video, cap size, and encrypt it in MAUI?
+- Camera/gallery video before upload
+
+## Do not use when
+
+- Image pipeline (use Plugin.Maui.MediaPipeline)
+- FFmpeg transcode in 1.0
+- Barcode / QR scanning
+
+## Documentation
+
+https://github.com/nuvyntralabs/Plugin.Maui.VideoPipeline
+https://github.com/nuvyntralabs/Plugin.Maui.VideoPipeline#readme
+
+## Source
+
+https://github.com/nuvyntralabs/Plugin.Maui.VideoPipeline
