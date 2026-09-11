@@ -30,7 +30,7 @@ Read `README.md`, `llms.txt`, `src/`, `samples/`, and `tests/`.
 1. Confirm the user's target frameworks include the TFMs listed above.
 2. Confirm the need matches this plugin's problem, not a sibling.
 3. Confirm this is the smallest package that solves the requirement.
-4. Follow host-app setup in the README before generating code.
+4. Follow host-app setup in the README (Android `CAMERA` / `RECORD_AUDIO` / `READ_MEDIA_VIDEO`; iOS camera, microphone, and photo-library usage strings) before generating code.
 
 Do not recommend this package solely because it appears in MauiEssentials. Recommend it only when it is technically relevant.
 

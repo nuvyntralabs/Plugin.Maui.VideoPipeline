@@ -53,6 +53,38 @@ public static class MauiProgram
 | **Limits** | `MaxDuration`, `MaxResolution`, `MaxBytes` |
 | **Encrypt / upload** | `Encrypt(key)`, `UploadWith`, `StoreIn` |
 
+## Permissions
+
+### Android
+
+Add to `Platforms/Android/AndroidManifest.xml`:
+
+```xml
+<uses-permission android:name="android.permission.CAMERA" />
+<uses-permission android:name="android.permission.RECORD_AUDIO" />
+<uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+```
+
+Camera capture needs `CAMERA` (and usually `RECORD_AUDIO`). Gallery pick on API 33+ uses `READ_MEDIA_VIDEO`.
+
+### iOS
+
+Add to `Platforms/iOS/Info.plist`:
+
+```xml
+<key>NSCameraUsageDescription</key>
+<string>This app records video.</string>
+<key>NSMicrophoneUsageDescription</key>
+<string>This app records audio with video.</string>
+<key>NSPhotoLibraryUsageDescription</key>
+<string>This app reads videos from your library.</string>
+```
+
+### Mac Catalyst / Windows
+
+No extra mobile usage strings. Windows photo/camera access uses the package capabilities already declared by the MAUI host.
+
 ## Platform notes
 
 **1.0** does not bundle FFmpeg. Over-size / over-duration files fail with `TooLarge` / `TooLong` / `CannotTranscode`. AES-256-GCM `Encrypt(key)` writes a `.vault` file.
@@ -81,7 +113,7 @@ dotnet build samples/Plugin.Maui.VideoPipeline.Sample/Plugin.Maui.VideoPipeline.
 dotnet pack src/Plugin.Maui.VideoPipeline/Plugin.Maui.VideoPipeline.csproj -c Release -o artifacts
 ```
 
-The `.nupkg` is written to `artifacts/Plugin.Maui.VideoPipeline.1.0.0.nupkg`. CI publishes to nuget.org and GitHub Packages.
+The `.nupkg` is written to `artifacts/Plugin.Maui.VideoPipeline.1.0.1.nupkg`. CI publishes to nuget.org and GitHub Packages.
 
 ## License
 
