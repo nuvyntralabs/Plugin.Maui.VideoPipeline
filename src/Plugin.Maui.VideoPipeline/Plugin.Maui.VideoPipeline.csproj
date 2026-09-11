@@ -25,13 +25,14 @@
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageTags>dotnet-maui;maui;maui-plugin;cross-platform;android;ios;nuget;mauiessentials;video;pipeline;encrypt;thumbnail;camera</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageIcon>icon.png</PackageIcon>
     <PackageProjectUrl>https://nuvyntralabs.github.io/packages/plugin-maui-video-pipeline/</PackageProjectUrl>
     <RepositoryUrl>https://github.com/nuvyntralabs/Plugin.Maui.VideoPipeline</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
-    <Version>1.0.1</Version>
+    <Version>1.0.2</Version>
     <IsPackable>true</IsPackable>
     <PackageOutputPath>$(MSBuildThisFileDirectory)..\..\artifacts</PackageOutputPath>
   </PropertyGroup>
@@ -42,6 +43,7 @@
   <ItemGroup>
     <None Include="..\..\README.md" Pack="true" PackagePath="\" />
     <None Include="..\..\LICENSE" Pack="true" PackagePath="\" />
+    <None Include="..\..\nuget.png" Pack="true" PackagePath="icon.png" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Plugin.Maui.VideoPipeline.Tests" />

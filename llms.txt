@@ -16,7 +16,7 @@ Platforms: Android, iOS, Mac Catalyst, Windows (shared library).
 
 ## Current release
 
-1.0.1. Host apps must declare Android and iOS permissions listed in the README.
+1.0.2. Host apps must declare Android and iOS permissions listed in the README.
 
 ## Installation
 
