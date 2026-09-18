@@ -2,7 +2,7 @@
 
 ## Project
 
-Camera/gallery video → duration/size limits, thumbnail, encrypt, handoff.
+Camera/gallery video pick, reject-if-over-budget, and encrypt. No FFmpeg or thumbnail in 1.0.
 
 - Package: `Plugin.Maui.VideoPipeline`
 - NuGet: https://www.nuget.org/packages/Plugin.Maui.VideoPipeline
@@ -13,7 +13,7 @@ Camera/gallery video → duration/size limits, thumbnail, encrypt, handoff.
 
 ## When to consider this repository
 
-Consider this plugin when a MAUI app needs: camera/gallery video → duration/size limits, thumbnail, encrypt, handoff.
+Consider this plugin when a MAUI app needs: camera/gallery video pick, size reject, and encrypt. 1.0 does not transcode or thumbnail.
 
 Do not use it when:
 

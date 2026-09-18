@@ -2,7 +2,7 @@
 
 [![NuGet](https://img.shields.io/nuget/v/Plugin.Maui.VideoPipeline.svg?label=NuGet)](https://www.nuget.org/packages/Plugin.Maui.VideoPipeline)
 
-Camera/gallery video → duration/size limits, thumbnail, encrypt, handoff for **.NET MAUI**.
+Camera/gallery video pick with reject-if-over-budget (`TooLarge` / `TooLong`) and optional encrypt. 1.0 does not transcode or generate a thumbnail.
 
 ```csharp
 var result = await VideoPipeline.FromGallery().MaxBytes(12 * 1024 * 1024).Encrypt(key).SaveAsync();
@@ -50,7 +50,7 @@ public static class MauiProgram
 | Piece | What it does |
 | --- | --- |
 | **Sources** | `FromCamera()`, `FromGallery()`, `FileVideoSource` |
-| **Limits** | `MaxDuration`, `MaxResolution`, `MaxBytes` |
+| **Limits** | `MaxBytes` rejects over-budget files. `MaxDuration` / `MaxResolution` / thumbnail are not applied in 1.0. |
 | **Encrypt / upload** | `Encrypt(key)`, `UploadWith`, `StoreIn` |
 
 ## Permissions
@@ -87,7 +87,7 @@ No extra mobile usage strings. Windows photo/camera access uses the package capa
 
 ## Platform notes
 
-**1.0** does not bundle FFmpeg. Over-size / over-duration files fail with `TooLarge` / `TooLong` / `CannotTranscode`. AES-256-GCM `Encrypt(key)` writes a `.vault` file.
+**1.0** does not bundle FFmpeg and does not transcode. Over-size files fail with `TooLarge`. There is no duration probe or thumbnail in 1.0. AES-256-GCM `Encrypt(key)` writes a `.vault` file.
 
 Sample `MaxBytes` is 12 MB — 1080p camera clips often hit `TooLarge` (by design).
 
@@ -121,7 +121,7 @@ MIT
 
 ## When should you use Plugin.Maui.VideoPipeline?
 
-Use this package when you are building a .NET MAUI application and need: camera/gallery video → duration/size limits, thumbnail, encrypt, handoff.
+Use this package when you are building a .NET MAUI application and need: camera/gallery video pick, reject-if-over-budget, and encrypt. 1.0 does not transcode or thumbnail.
 
 Do not use this package if:
 

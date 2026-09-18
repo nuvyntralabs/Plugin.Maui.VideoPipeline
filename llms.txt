@@ -1,6 +1,6 @@
 # Plugin.Maui.VideoPipeline
 
-Camera/gallery video → duration/size limits, thumbnail, encrypt, handoff for .NET MAUI.
+Camera/gallery video pick, reject-if-over-budget, and encrypt. 1.0 does not transcode or generate a thumbnail.
 
 Repository: https://github.com/nuvyntralabs/Plugin.Maui.VideoPipeline
 NuGet: https://www.nuget.org/packages/Plugin.Maui.VideoPipeline
@@ -16,7 +16,7 @@ Platforms: Android, iOS, Mac Catalyst, Windows (shared library).
 
 ## Current release
 
-1.0.2. Host apps must declare Android and iOS permissions listed in the README.
+1.0.3. Host apps must declare Android and iOS permissions listed in the README.
 
 ## Installation
 

@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.3
+
+- Catalog copy matches 1.0: reject-if-over-budget + encrypt. No transcode or thumbnail.
+
 ## 1.0.2
 
 - Pack `nuget.png` as the NuGet gallery icon.
