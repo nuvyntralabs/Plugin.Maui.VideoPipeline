@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.0
+
+- Probe duration / size / resolution and generate a JPEG thumbnail when the OS can decode a frame.
+- Over-budget clips try an OS transcode (Android `MediaCodec`, iOS/Catalyst `AVAssetExportSession`). No FFmpeg.
+- Android transcode honors cancel and times out instead of spinning if the encoder never signals EOS.
+- If the device cannot encode, the result is `CannotTranscode` — never a crash.
+- `UseVideoPipeline` default max duration applies when the builder does not set `MaxDuration`.
+
 ## 1.0.3
 
 - Catalog copy matches 1.0: reject-if-over-budget + encrypt. No transcode or thumbnail.

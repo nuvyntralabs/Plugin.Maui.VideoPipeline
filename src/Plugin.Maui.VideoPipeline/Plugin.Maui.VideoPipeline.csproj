@@ -18,7 +18,7 @@
     <AssemblyName>Plugin.Maui.VideoPipeline</AssemblyName>
     <PackageId>Plugin.Maui.VideoPipeline</PackageId>
     <Title>.NET MAUI VideoPipeline</Title>
-    <Description>Camera/gallery video pick, reject-if-over-budget, and encrypt. No FFmpeg or transcode in 1.0.</Description>
+    <Description>Camera/gallery video pick, thumbnail, and OS transcode when over budget. No FFmpeg; CannotTranscode if the device cannot encode.</Description>
     <Authors>Niladri</Authors>
     <Company>MauiEssentials</Company>
     <Copyright>Copyright © 2026 Niladri</Copyright>
@@ -32,7 +32,7 @@
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
-    <Version>1.0.3</Version>
+    <Version>1.1.0</Version>
     <IsPackable>true</IsPackable>
     <PackageOutputPath>$(MSBuildThisFileDirectory)..\..\artifacts</PackageOutputPath>
   </PropertyGroup>

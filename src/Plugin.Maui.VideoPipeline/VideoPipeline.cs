@@ -28,6 +28,39 @@ public sealed class VideoPipelineResult
     public static VideoPipelineResult Fail(VideoPipelineStatus status, string? message = null) => new() { Status = status, Message = message };
 }
 
+public sealed class VideoProbe
+{
+    public TimeSpan Duration { get; init; }
+    public long Bytes { get; init; }
+    public int Width { get; init; }
+    public int Height { get; init; }
+}
+
+public sealed class VideoTranscodeRequest
+{
+    public int? MaxWidth { get; init; }
+    public int? MaxHeight { get; init; }
+    public long? MaxBytes { get; init; }
+    public TimeSpan? MaxDuration { get; init; }
+}
+
+public sealed class VideoTranscodeResult
+{
+    public VideoPipelineStatus Status { get; init; }
+    public string? OutputPath { get; init; }
+    public string? Message { get; init; }
+    public static VideoTranscodeResult Ok(string path) => new() { Status = VideoPipelineStatus.Ok, OutputPath = path };
+    public static VideoTranscodeResult Fail(VideoPipelineStatus status, string? message = null) =>
+        new() { Status = status, Message = message };
+}
+
+public interface IVideoProcessor
+{
+    Task<VideoProbe> ProbeAsync(string path, CancellationToken cancellationToken);
+    Task<string?> CreateThumbnailAsync(string path, TimeSpan at, CancellationToken cancellationToken);
+    Task<VideoTranscodeResult> TranscodeAsync(string path, VideoTranscodeRequest request, CancellationToken cancellationToken);
+}
+
 public interface IMediaUploader
 {
     Task UploadAsync(VideoArtifact artifact, CancellationToken cancellationToken = default);
@@ -61,6 +94,7 @@ public sealed class VideoPipelineBuilder
     byte[]? key;
     IMediaUploader? uploader;
     IMediaVault? vault;
+    IVideoProcessor processor = PlatformVideoProcessor.Create();
 
     internal VideoPipelineBuilder(IVideoSource source) => this.source = source;
 
@@ -72,10 +106,16 @@ public sealed class VideoPipelineBuilder
     public VideoPipelineBuilder Encrypt(byte[] aesKey) { key = aesKey; return this; }
     public VideoPipelineBuilder UploadWith(IMediaUploader mediaUploader) { uploader = mediaUploader; return this; }
     public VideoPipelineBuilder StoreIn(IMediaVault mediaVault) { vault = mediaVault; return this; }
+    public VideoPipelineBuilder UseProcessor(IVideoProcessor videoProcessor)
+    {
+        processor = videoProcessor ?? throw new ArgumentNullException(nameof(videoProcessor));
+        return this;
+    }
 
     public async Task<VideoPipelineResult> SaveAsync(CancellationToken cancellationToken = default)
     {
-        if (maxDuration is { } duration && duration <= TimeSpan.Zero)
+        var durationCap = maxDuration ?? VideoPipeline.RegisteredOptions?.DefaultMaxDuration;
+        if (durationCap is { } duration && duration <= TimeSpan.Zero)
             return VideoPipelineResult.Fail(VideoPipelineStatus.TooLong, "MaxDuration must be positive.");
         if (maxBytes is { } bytes && bytes <= 0)
             return VideoPipelineResult.Fail(VideoPipelineStatus.TooLarge, "MaxBytes must be positive.");
@@ -86,9 +126,38 @@ public sealed class VideoPipelineBuilder
         if (!File.Exists(path))
             return VideoPipelineResult.Fail(VideoPipelineStatus.Unsupported, "File does not exist.");
 
-        var info = new FileInfo(path);
-        if (maxBytes is { } limit && info.Length > limit)
-            return VideoPipelineResult.Fail(VideoPipelineStatus.TooLarge, $"File is {info.Length} bytes.");
+        var probe = await ProbeOrFileAsync(path, cancellationToken).ConfigureAwait(false);
+        var overDuration = durationCap is { } maxDur && probe.Duration > TimeSpan.Zero && probe.Duration > maxDur;
+        var overBytes = maxBytes is { } maxB && probe.Bytes > maxB;
+        var overRes = maxWidth is { } mw && maxHeight is { } mh && probe.Width > 0 && probe.Height > 0
+                      && (probe.Width > mw || probe.Height > mh);
+
+        if (overDuration || overBytes || overRes)
+        {
+            var transcoded = await processor.TranscodeAsync(path, new VideoTranscodeRequest
+            {
+                MaxWidth = maxWidth,
+                MaxHeight = maxHeight,
+                MaxBytes = maxBytes,
+                MaxDuration = durationCap
+            }, cancellationToken).ConfigureAwait(false);
+
+            if (transcoded.Status != VideoPipelineStatus.Ok || string.IsNullOrWhiteSpace(transcoded.OutputPath) || !File.Exists(transcoded.OutputPath))
+            {
+                if (transcoded.Status is VideoPipelineStatus.TooLarge or VideoPipelineStatus.TooLong)
+                    return VideoPipelineResult.Fail(transcoded.Status, transcoded.Message);
+                return VideoPipelineResult.Fail(VideoPipelineStatus.CannotTranscode, transcoded.Message ?? "Device cannot transcode this clip.");
+            }
+
+            path = transcoded.OutputPath;
+            probe = await ProbeOrFileAsync(path, cancellationToken).ConfigureAwait(false);
+            if (durationCap is { } stillDur && probe.Duration > TimeSpan.Zero && probe.Duration > stillDur)
+                return VideoPipelineResult.Fail(VideoPipelineStatus.TooLong, $"Duration is {probe.Duration}.");
+            if (maxBytes is { } stillBytes && probe.Bytes > stillBytes)
+                return VideoPipelineResult.Fail(VideoPipelineStatus.TooLarge, $"File is {probe.Bytes} bytes.");
+        }
+
+        var thumbnail = await processor.CreateThumbnailAsync(path, thumbnailAt, cancellationToken).ConfigureAwait(false);
 
         var work = path;
         var encrypted = false;
@@ -97,14 +166,14 @@ public sealed class VideoPipelineBuilder
             work = path + ".vault";
             await EncryptFileAsync(path, work, key, cancellationToken).ConfigureAwait(false);
             encrypted = true;
-            info = new FileInfo(work);
         }
 
+        var info = new FileInfo(work);
         var artifact = new VideoArtifact
         {
             VideoPath = work,
-            ThumbnailPath = null,
-            Duration = maxDuration ?? TimeSpan.Zero,
+            ThumbnailPath = thumbnail,
+            Duration = probe.Duration,
             Bytes = info.Length,
             Encrypted = encrypted
         };
@@ -114,10 +183,28 @@ public sealed class VideoPipelineBuilder
         if (vault is not null)
             await vault.StoreAsync(artifact, cancellationToken).ConfigureAwait(false);
         _ = stripMetadata;
-        _ = thumbnailAt;
-        _ = maxWidth;
-        _ = maxHeight;
         return VideoPipelineResult.Ok(artifact);
+    }
+
+    async Task<VideoProbe> ProbeOrFileAsync(string path, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var probe = await processor.ProbeAsync(path, cancellationToken).ConfigureAwait(false);
+            if (probe.Bytes > 0)
+                return probe;
+            return new VideoProbe
+            {
+                Duration = probe.Duration,
+                Bytes = new FileInfo(path).Length,
+                Width = probe.Width,
+                Height = probe.Height
+            };
+        }
+        catch
+        {
+            return new VideoProbe { Bytes = new FileInfo(path).Length };
+        }
     }
 
     internal static async Task EncryptFileAsync(string sourcePath, string destPath, byte[] aesKey, CancellationToken cancellationToken)
@@ -149,10 +236,19 @@ public sealed class VideoPipelineBuilder
 
 public static class VideoPipeline
 {
+    internal static VideoPipelineOptions? RegisteredOptions { get; set; }
+
     public static VideoPipelineBuilder FromFile(string path) => new(new FileVideoSource { Path = path });
-    public static VideoPipelineBuilder FromSource(IVideoSource source) => new(source);
+    public static VideoPipelineBuilder FromSource(IVideoSource source) => new(new GuardedSource(source));
     public static VideoPipelineBuilder FromCamera() => new(new PickerVideoSource(true));
     public static VideoPipelineBuilder FromGallery() => new(new PickerVideoSource(false));
+}
+
+sealed class GuardedSource : IVideoSource
+{
+    readonly IVideoSource inner;
+    public GuardedSource(IVideoSource inner) => this.inner = inner;
+    public Task<string?> PickAsync(CancellationToken cancellationToken) => inner.PickAsync(cancellationToken);
 }
 
 public static class MauiAppBuilderExtensions
@@ -162,6 +258,7 @@ public static class MauiAppBuilderExtensions
         ArgumentNullException.ThrowIfNull(builder);
         var options = new VideoPipelineOptions();
         configure?.Invoke(options);
+        VideoPipeline.RegisteredOptions = options;
         builder.Services.AddSingleton(options);
         return builder;
     }
@@ -179,3 +276,27 @@ sealed class PickerVideoSource : IVideoSource
         return result?.FullPath;
     }
 }
+
+sealed class SharedVideoProcessor : IVideoProcessor
+{
+    public static SharedVideoProcessor Instance { get; } = new();
+
+    public Task<VideoProbe> ProbeAsync(string path, CancellationToken cancellationToken)
+    {
+        var info = new FileInfo(path);
+        return Task.FromResult(new VideoProbe { Bytes = info.Exists ? info.Length : 0 });
+    }
+
+    public Task<string?> CreateThumbnailAsync(string path, TimeSpan at, CancellationToken cancellationToken) =>
+        Task.FromResult<string?>(null);
+
+    public Task<VideoTranscodeResult> TranscodeAsync(string path, VideoTranscodeRequest request, CancellationToken cancellationToken) =>
+        Task.FromResult(VideoTranscodeResult.Fail(VideoPipelineStatus.CannotTranscode, "No FFmpeg. This target cannot transcode."));
+}
+
+#if !ANDROID && !IOS && !MACCATALYST && !WINDOWS
+sealed class PlatformVideoProcessor
+{
+    public static IVideoProcessor Create() => SharedVideoProcessor.Instance;
+}
+#endif

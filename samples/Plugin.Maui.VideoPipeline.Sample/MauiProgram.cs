@@ -10,7 +10,7 @@ public static class MauiProgram
         var builder = MauiApp.CreateBuilder();
         builder.Services.AddSingleton<MainPage>();
         builder.UseMauiApp<App>()
-            .UseVideoPipeline();
+            .UseVideoPipeline(o => o.DefaultMaxDuration = TimeSpan.FromSeconds(30));
 #if DEBUG
         builder.Logging.AddDebug();
 #endif

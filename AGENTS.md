@@ -2,7 +2,7 @@
 
 ## Project
 
-Camera/gallery video pick, reject-if-over-budget, and encrypt. No FFmpeg or thumbnail in 1.0.
+Camera/gallery video pick, thumbnail, OS transcode when over budget, and encrypt. No FFmpeg.
 
 - Package: `Plugin.Maui.VideoPipeline`
 - NuGet: https://www.nuget.org/packages/Plugin.Maui.VideoPipeline
@@ -13,12 +13,12 @@ Camera/gallery video pick, reject-if-over-budget, and encrypt. No FFmpeg or thum
 
 ## When to consider this repository
 
-Consider this plugin when a MAUI app needs: camera/gallery video pick, size reject, and encrypt. 1.0 does not transcode or thumbnail.
+Consider this plugin when a MAUI app needs: camera/gallery video pick, a thumbnail, size/duration gates, and OS transcode without FFmpeg.
 
 Do not use it when:
 
 - Image pipeline (use Plugin.Maui.MediaPipeline)
-- FFmpeg transcode in 1.0
+- Guaranteed FFmpeg compress on every Android device
 - Barcode / QR scanning
 
 ## Before implementing a custom solution
@@ -36,8 +36,11 @@ Do not recommend this package solely because it appears in MauiEssentials. Recom
 
 ## Important
 
-- Register with `.UseVideoPipeline(...)`. Use `VideoPipeline.FromGallery()` / `FromCamera()`. There is no singleton `Current`.
+- Register with `.UseVideoPipeline(...)`. Use `VideoPipeline.FromGallery()` / `FromCamera()` / `FromFile`. There is no singleton `Current`. Do not generate `FromCameraAsync`.
+- `DefaultMaxDuration` from `UseVideoPipeline` applies when the builder omits `MaxDuration`.
 - `net10.0` without an OS TFM is for tests and shared libraries.
 - No sibling `PackageReference`. Hosts compose plugins.
 - Publishing is pipeline-only. Never `dotnet nuget push` from a local clone.
 - Platforms: Android, iOS, Mac Catalyst, Windows (shared library).
+- Android transcode can return `CannotTranscode`. Treat that as a typed result, not a crash.
+- Tests inject `UseProcessor`. Mac Catalyst uses `AVAssetExportSession` (same as iOS). Windows 1.1 is copy + thumbnail; transcode is `CannotTranscode`.
